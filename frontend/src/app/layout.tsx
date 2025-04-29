@@ -4,7 +4,6 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import '@mysten/dapp-kit/dist/index.css';
 import { AppProvider } from '@/components/providers/app-provider';
-import { WalletProvider } from '@/components/wallet/WalletProvider';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -22,9 +21,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <AppProvider>
-          <WalletProvider>
-            {children}
-          </WalletProvider>
+          {children}
         </AppProvider>
       </body>
     </html>

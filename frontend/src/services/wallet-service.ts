@@ -1,200 +1,273 @@
-// Note: Make sure to install required packages:
-// npm install @suiet/wallet-kit @mysten/sui.js @mysten/wallet-standard
+import { EventEmitter } from 'events';
+import { BaseWalletAdapter, WalletEvent, WalletConnectionStatus } from '@/components/wallet/adapters/base-adapter';
+import { retryOperation } from '@/utils/error-handlers';
 
-import { createAppError, ErrorType, handleError } from '@/utils/error-handlers';
-import { SuiClient } from '@mysten/sui.js/client';
-import { TransactionBlock } from '@mysten/sui.js/transactions';
-import { blockchainClient } from './blockchain-client';
+// Error types
+export enum WalletServiceErrorType {
+  NO_ADAPTER = 'NO_ADAPTER',
+  CONNECTION_ERROR = 'CONNECTION_ERROR',
+  OPERATION_ERROR = 'OPERATION_ERROR',
+}
 
-/**
- * 钱包连接状态
- */
-export enum WalletConnectionStatus {
-  DISCONNECTED = 'disconnected',
-  CONNECTING = 'connecting',
-  CONNECTED = 'connected',
+// Error class
+export class WalletServiceError extends Error {
+  type: WalletServiceErrorType;
+
+  constructor(type: WalletServiceErrorType, message: string) {
+    super(message);
+    this.type = type;
+    this.name = 'WalletServiceError';
+  }
+}
+
+// Export wallet event types
+export enum WalletEvents {
+  CONNECT = 'connect',
+  DISCONNECT = 'disconnect',
+  ACCOUNT_CHANGE = 'accountChange',
   ERROR = 'error',
+  ADAPTER_CHANGE = 'adapterChange'
 }
 
 /**
- * 钱包账户信息
+ * Wallet service class that manages wallet adapters and provides a unified interface
  */
-export interface WalletAccount {
-  address: string;
-  publicKey: string;
-  label?: string;
-  iconUrl?: string;
-}
-
-/**
- * 钱包交互和管理服务
- */
-export class WalletService {
-  private walletInstance: any | null = null;
-  private client: SuiClient;
+class WalletServiceImpl extends EventEmitter {
+  private _adapter: BaseWalletAdapter | null = null;
+  private _address: string | null = null;
+  private _redirectUrl: string | null = null;
 
   constructor() {
-    this.client = blockchainClient.getSuiClient();
+    super();
+    this.setMaxListeners(50); // Increase maximum number of listeners to avoid warnings
   }
 
   /**
-   * 初始化钱包连接
+   * Initialize wallet adapter
+   * @param adapter Wallet adapter instance
    */
-  public initWallet(walletProvider: any): void {
-    this.walletInstance = walletProvider;
-  }
-
-  /**
-   * 检查钱包是否正确初始化
-   */
-  public isInitialized(): boolean {
-    return !!this.walletInstance;
-  }
-
-  /**
-   * 获取钱包连接状态
-   */
-  public getStatus(): WalletConnectionStatus {
-    if (!this.walletInstance) {
-      return WalletConnectionStatus.DISCONNECTED;
+  initAdapter(adapter: BaseWalletAdapter): void {
+    // If there's an existing adapter, remove its listeners first
+    if (this._adapter) {
+      this.removeAdapterListeners(this._adapter);
     }
 
-    try {
-      const isConnected = this.walletInstance.isConnected();
-      return isConnected ? WalletConnectionStatus.CONNECTED : WalletConnectionStatus.DISCONNECTED;
-    } catch (error) {
-      console.error('检查钱包连接状态出错:', error);
-      return WalletConnectionStatus.ERROR;
-    }
+    this._adapter = adapter;
+    this._address = null;
+    
+    // Add event listeners
+    this.setupAdapterListeners(adapter);
+    
+    // Trigger adapter change event
+    this.emit('adapterChange', adapter);
   }
 
   /**
-   * 连接钱包
+   * Set up event listeners for the adapter
    */
-  public async connect(): Promise<WalletAccount> {
-    try {
-      if (!this.walletInstance) {
-        throw createAppError('钱包提供程序未初始化', ErrorType.WALLET);
-      }
-
-      const accounts = await this.walletInstance.getAccounts();
-      if (!accounts || accounts.length === 0) {
-        throw createAppError('钱包中未找到账户', ErrorType.WALLET);
-      }
-
-      const account = accounts[0];
-      return {
-        address: account.address,
-        publicKey: account.publicKey?.toString() || '',
-        label: account.label,
-        iconUrl: account.iconUrl,
-      };
-    } catch (error) {
-      throw handleError(error, {
-        context: 'WalletService.connect',
-        fallbackMessage: '连接钱包失败',
-      });
-    }
+  private setupAdapterListeners(adapter: BaseWalletAdapter): void {
+    // Listen for wallet connection events
+    adapter.on(WalletEvent.CONNECT, this.handleConnect.bind(this));
+    // Listen for wallet disconnection events
+    adapter.on(WalletEvent.DISCONNECT, this.handleDisconnect.bind(this));
+    // Listen for wallet account change events
+    adapter.on(WalletEvent.ACCOUNT_CHANGE, this.handleAccountChange.bind(this));
+    // Listen for wallet error events
+    adapter.on(WalletEvent.ERROR, this.handleError.bind(this));
   }
 
   /**
-   * 断开钱包连接
+   * Remove adapter event listeners
    */
-  public async disconnect(): Promise<void> {
-    try {
-      if (this.walletInstance && this.walletInstance.disconnect) {
-        await this.walletInstance.disconnect();
-      }
-    } catch (error) {
-      throw handleError(error, {
-        context: 'WalletService.disconnect',
-        fallbackMessage: '断开钱包连接失败',
-      });
-    }
+  private removeAdapterListeners(adapter: BaseWalletAdapter): void {
+    adapter.removeAllListeners();
   }
 
   /**
-   * 获取钱包账户
+   * Handle wallet connection event
    */
-  public async getAccount(): Promise<WalletAccount | null> {
-    try {
-      if (!this.walletInstance || !this.walletInstance.isConnected()) {
-        return null;
-      }
-
-      const accounts = await this.walletInstance.getAccounts();
-      if (!accounts || accounts.length === 0) {
-        return null;
-      }
-
-      const account = accounts[0];
-      return {
-        address: account.address,
-        publicKey: account.publicKey?.toString() || '',
-        label: account.label,
-        iconUrl: account.iconUrl,
-      };
-    } catch (error) {
-      console.error('获取钱包账户出错:', error);
-      return null;
-    }
+  private handleConnect(): void {
+    if (!this._adapter) return;
+    
+    this._address = this._adapter.address;
+    this.emit('connect', this._address);
   }
 
   /**
-   * 获取钱包余额
+   * Handle wallet disconnection event
    */
-  public async getBalance(address?: string): Promise<bigint> {
-    try {
-      const account = await this.getAccount();
-      if (!account && !address) {
-        throw createAppError('未连接钱包且未提供地址', ErrorType.WALLET);
-      }
-
-      const targetAddress = address || account!.address;
-      return await blockchainClient.getBalance(targetAddress);
-    } catch (error) {
-      throw handleError(error, {
-        context: 'WalletService.getBalance',
-        fallbackMessage: '获取钱包余额失败',
-      });
-    }
+  private handleDisconnect(): void {
+    this._address = null;
+    this.emit('disconnect');
   }
 
   /**
-   * 执行交易
+   * Handle wallet account change event
    */
-  public async executeTransaction(
-    transactionBlock: TransactionBlock,
-    options?: {
-      requestType?: 'WaitForLocalExecution' | 'WaitForEffectsCert';
-    }
-  ) {
-    try {
-      if (!this.walletInstance || !this.walletInstance.isConnected()) {
-        throw createAppError('钱包未连接', ErrorType.WALLET);
-      }
+  private handleAccountChange(address: string): void {
+    this._address = address;
+    this.emit('accountChange', address);
+  }
 
-      // 从钱包实例获取签名者
-      const signer = this.walletInstance.getAccounts()[0];
-      if (!signer) {
-        throw createAppError('钱包中没有可用账户', ErrorType.WALLET);
-      }
+  /**
+   * Handle wallet error event
+   */
+  private handleError(error: Error): void {
+    this.emit('error', error);
+  }
 
-      // 执行交易
-      return await blockchainClient.executeTransaction(
-        transactionBlock,
-        this.walletInstance,
-        options
+  /**
+   * Trigger connection event
+   */
+  dispatchConnectEvent(address: string): void {
+    this._address = address;
+    this.emit(WalletEvents.CONNECT, address);
+  }
+
+  /**
+   * Trigger disconnection event
+   */
+  dispatchDisconnectEvent(): void {
+    this._address = null;
+    this.emit(WalletEvents.DISCONNECT);
+  }
+
+  /**
+   * Trigger error event
+   */
+  dispatchErrorEvent(error: any): void {
+    this.emit(WalletEvents.ERROR, error);
+  }
+
+  /**
+   * Set redirect URL
+   */
+  setRedirectUrl(url: string): void {
+    this._redirectUrl = url;
+  }
+
+  /**
+   * Get redirect URL
+   */
+  getRedirectUrl(): string | null {
+    return this._redirectUrl;
+  }
+
+  /**
+   * Clear redirect URL
+   */
+  clearRedirectUrl(): void {
+    this._redirectUrl = null;
+  }
+
+  /**
+   * Add event listener
+   */
+  addEventListener(event: string, listener: (...args: any[]) => void): void {
+    this.on(event, listener);
+  }
+
+  /**
+   * Remove event listener
+   */
+  removeEventListener(event: string, listener: (...args: any[]) => void): void {
+    this.off(event, listener);
+  }
+
+  /**
+   * Connect wallet
+   */
+  async connect(): Promise<string | null> {
+    if (!this._adapter) {
+      throw new WalletServiceError(
+        WalletServiceErrorType.NO_ADAPTER,
+        'No wallet adapter set'
       );
-    } catch (error) {
-      throw handleError(error, {
-        context: 'WalletService.executeTransaction',
-        fallbackMessage: '执行交易失败',
-      });
     }
+
+    try {
+      // Use retry mechanism to connect wallet
+      await retryOperation(
+        () => this._adapter!.connect(),
+        {
+          retries: 3,
+          interval: 500,
+          shouldRetry: (error) => {
+            // Decide whether to retry based on error type
+            return !(error instanceof WalletServiceError);
+          }
+        }
+      );
+      
+      return this._address;
+    } catch (error) {
+      console.error('Failed to connect wallet:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      throw new WalletServiceError(
+        WalletServiceErrorType.CONNECTION_ERROR,
+        `Failed to connect wallet: ${message}`
+      );
+    }
+  }
+
+  /**
+   * Disconnect wallet
+   */
+  async disconnect(): Promise<void> {
+    if (!this._adapter) {
+      throw new WalletServiceError(
+        WalletServiceErrorType.NO_ADAPTER,
+        'No wallet adapter set'
+      );
+    }
+
+    try {
+      await this._adapter.disconnect();
+    } catch (error) {
+      console.error('Failed to disconnect wallet:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      throw new WalletServiceError(
+        WalletServiceErrorType.OPERATION_ERROR,
+        `Failed to disconnect wallet: ${message}`
+      );
+    }
+  }
+
+  /**
+   * Get connection status
+   */
+  get connectionStatus(): WalletConnectionStatus {
+    return this._adapter ? this._adapter.connectionStatus : WalletConnectionStatus.DISCONNECTED;
+  }
+
+  /**
+   * Get current connected wallet address
+   */
+  get address(): string | null {
+    return this._address;
+  }
+
+  /**
+   * Get current adapter
+   */
+  get adapter(): BaseWalletAdapter | null {
+    return this._adapter;
+  }
+
+  /**
+   * Check if wallet is connected
+   */
+  get isConnected(): boolean {
+    return this.connectionStatus === WalletConnectionStatus.CONNECTED;
+  }
+
+  /**
+   * Check if wallet is connecting
+   */
+  get isConnecting(): boolean {
+    return this.connectionStatus === WalletConnectionStatus.CONNECTING;
   }
 }
 
-// 导出默认实例
-const walletService = new WalletService();
-export { walletService };
+// Export singleton instance
+export const WalletService = new WalletServiceImpl(); 

@@ -1,69 +1,95 @@
 /**
- * 钱包适配器基础接口
- * 为不同的钱包SDK提供统一的接口
+ * Wallet Adapter Configuration
  */
-
 export interface WalletAdapterConfig {
-  name: string;
-  autoConnect?: boolean;
+  name: string; // Wallet name
+  icon?: string; // Wallet icon
 }
 
+/**
+ * Wallet Account Information
+ */
 export interface WalletAccount {
-  address: string;
-  publicKey?: string;
-  label?: string;
-  iconUrl?: string;
+  address: string; // Wallet address
+  publicKey?: string; // Public key
+  isDefault?: boolean; // Whether it's the default account
+  label?: string; // Account label
+  iconUrl?: string; // Account icon
 }
 
-export interface WalletTransaction {
-  transactionBlock: any;
-  options?: any;
-}
-
+/**
+ * Wallet Balance Information
+ */
 export interface WalletBalance {
-  amount: bigint;
-  decimals: number;
-  symbol: string;
+  token: string; // Token symbol or address
+  amount: string; // Balance amount
+  decimals: number; // Decimal places
 }
 
-export interface BaseWalletAdapter {
-  // 基本信息
-  name: string;
-  isConnected: boolean;
-  isConnecting: boolean;
-  chainId?: string;
-  network?: string;
-  account?: WalletAccount | null;
-  
-  // 连接管理
-  connect(): Promise<WalletAccount | null>;
-  disconnect(): Promise<void>;
-  
-  // 交易相关
-  signAndExecuteTransaction(transaction: WalletTransaction): Promise<any>;
-  
-  // 账户信息
-  getBalance(): Promise<WalletBalance | null>;
-  getAddress(): string | null;
-  
-  // 事件
-  on(event: string, callback: (data: any) => void): void;
-  off(event: string, callback: (data: any) => void): void;
+/**
+ * Wallet Transaction Type
+ */
+export interface WalletTransaction {
+  transactionBlock: any; // Transaction data
+  options?: {
+    showEvents?: boolean;
+    showEffects?: boolean;
+    showInput?: boolean;
+    showObjectChanges?: boolean;
+  };
 }
 
-// 钱包事件类型
+/**
+ * Wallet Event Types
+ */
 export enum WalletEvent {
   CONNECT = 'connect',
   DISCONNECT = 'disconnect',
   ACCOUNT_CHANGE = 'accountChange',
-  CHAIN_CHANGE = 'chainChange',
+  STATUS_CHANGE = 'statusChange',
+  NETWORK_CHANGE = 'networkChange',
   ERROR = 'error'
 }
 
-// 钱包连接状态
+/**
+ * Wallet Connection Status
+ */
 export enum WalletConnectionStatus {
-  CONNECTED = 'connected',
-  CONNECTING = 'connecting',
   DISCONNECTED = 'disconnected',
+  CONNECTING = 'connecting',
+  CONNECTED = 'connected',
   ERROR = 'error'
+}
+
+/**
+ * Base Wallet Adapter Interface
+ * Defines the methods and properties that wallet adapters must implement
+ */
+export interface BaseWalletAdapter {
+  // Basic information
+  readonly name: string; // Wallet name
+  readonly icon?: string; // Wallet icon
+  readonly connectionStatus: WalletConnectionStatus; // Connection status
+  readonly address: string | null; // Currently connected wallet address
+
+  // Connection management
+  connect(): Promise<string>; // Connect wallet, returns address
+  disconnect(): Promise<void>; // Disconnect
+
+  // Account management
+  getAccounts(): Promise<WalletAccount[]>; // Get account list
+
+  // Balance queries
+  getBalance(tokenOrSymbol?: string): Promise<WalletBalance | null>; // Get specific token balance
+  getAllBalances?(): Promise<WalletBalance[]>; // Get all balances
+
+  // Transactions and signatures
+  sendTransaction(transaction: any): Promise<string>; // Send transaction
+  signMessage?(message: string): Promise<string>; // Sign message
+  signAndExecuteTransactionBlock?(transaction: WalletTransaction): Promise<any>; // Sign and execute transaction
+
+  // Event handling
+  on(event: string, listener: (...args: any[]) => void): this; // Add event listener
+  off(event: string, listener: (...args: any[]) => void): this; // Remove event listener
+  removeAllListeners(event?: string): this; // Remove all event listeners
 } 

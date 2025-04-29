@@ -8,8 +8,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { NotificationTest } from '@/components/test/notification-test';
-import { ErrorTest } from '@/components/test/error-test';
 import Link from 'next/link';
 
 export default function Home() {
@@ -32,15 +30,6 @@ export default function Home() {
               <Button size="lg" variant="outline" asChild>
                 <Link href="/docs">Learn More</Link>
               </Button>
-            </div>
-
-            <div className="mt-8 w-full">
-              <div className="mb-8">
-                <NotificationTest />
-              </div>
-              <div>
-                <ErrorTest />
-              </div>
             </div>
           </div>
         </div>

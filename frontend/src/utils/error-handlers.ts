@@ -306,34 +306,56 @@ export function handleApiError(error: any, operation: string = 'request'): void 
 }
 
 /**
- * Retry function, can be used to retry multiple times in case of failure
+ * Error handling utility functions
+ */
+
+/**
+ * Retry configuration options
+ */
+interface RetryOptions {
+  retries?: number; // Maximum number of retries
+  interval?: number; // Retry interval (milliseconds)
+  shouldRetry?: (error: unknown) => boolean; // Function to determine if retry should be attempted
+}
+
+/**
+ * Execute operation with retry functionality
+ * @param operation Operation function to execute
+ * @param options Retry configuration options
+ * @returns Return value of the operation function
  */
 export async function retryOperation<T>(
   operation: () => Promise<T>,
-  maxRetries: number = 2,
-  delayMs: number = 1000
+  options: RetryOptions | number = 3
 ): Promise<T> {
-  let lastError: unknown;
+  // If options is a number, it represents the number of retries
+  const retryOptions: RetryOptions = typeof options === 'number' 
+    ? { retries: options } 
+    : options;
 
+  const maxRetries = retryOptions.retries ?? 3;
+  const interval = retryOptions.interval ?? 1000;
+  const shouldRetry = retryOptions.shouldRetry ?? (() => true);
+
+  let lastError: unknown;
+  
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      // Try to execute operation
       return await operation();
     } catch (error) {
       lastError = error;
-
-      // If maximum retries reached, do not retry
-      if (attempt >= maxRetries) {
+      
+      // Stop retrying if max retries reached or shouldRetry returns false
+      if (attempt >= maxRetries || !shouldRetry(error)) {
         break;
       }
-
-      // Wait for a period before retrying (each retry increases waiting time)
-      const waitTime = delayMs * Math.pow(2, attempt);
-      await new Promise(resolve => setTimeout(resolve, waitTime));
+      
+      // Wait for specified interval before retrying
+      await new Promise(resolve => setTimeout(resolve, interval));
     }
   }
-
-  // If all attempts fail, throw the last error
+  
+  // All retries failed, throw the last caught error
   throw lastError;
 }
 

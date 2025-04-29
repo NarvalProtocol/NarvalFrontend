@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ThemeSwitcher } from '@/components/ui/theme-switcher';
-import { ConnectWallet } from '@/components/wallet/connect-button';
+import { ConnectButton } from '@/components/wallet';
 import { Menu } from 'lucide-react';
 
 interface HeaderProps {
@@ -67,7 +67,7 @@ export function Header({ onOpenSidebar }: HeaderProps) {
         </div>
         <div className="flex items-center gap-3">
           <ThemeSwitcher />
-          <ConnectWallet />
+          <ConnectButton />
         </div>
       </div>
     </header>
