@@ -1,0 +1,56 @@
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+
+export function Header() {
+  return (
+    <header className="border-b">
+      <div className="container flex h-16 items-center justify-between">
+        <div className="flex items-center gap-6">
+          <Link href="/" className="font-bold text-xl">
+            Narval
+          </Link>
+          <nav className="hidden md:flex items-center gap-4">
+            <Link href="/lend" className="text-sm font-medium hover:underline underline-offset-4">
+              Lend
+            </Link>
+            <Link href="/borrow" className="text-sm font-medium hover:underline underline-offset-4">
+              Borrow
+            </Link>
+            <Link href="/swap" className="text-sm font-medium hover:underline underline-offset-4">
+              Swap
+            </Link>
+            <Link
+              href="/refinance"
+              className="text-sm font-medium hover:underline underline-offset-4"
+            >
+              Refinance
+            </Link>
+            <Link href="/stats" className="text-sm font-medium hover:underline underline-offset-4">
+              Stats
+            </Link>
+            <Link
+              href="/multiply"
+              className="text-sm font-medium hover:underline underline-offset-4"
+            >
+              Multiply
+            </Link>
+            <Link
+              href="/smart-lending"
+              className="text-sm font-medium hover:underline underline-offset-4"
+            >
+              Smart Lending
+            </Link>
+            <Link href="/gov" className="text-sm font-medium hover:underline underline-offset-4">
+              Gov
+            </Link>
+          </nav>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm">
+            Connect Wallet
+          </Button>
+        </div>
+      </div>
+    </header>
+  );
+}
