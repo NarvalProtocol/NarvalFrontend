@@ -1,9 +1,12 @@
+'use client';
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { ThemeSwitcher } from '@/components/ui/theme-switcher';
 
 export function Header() {
   return (
-    <header className="border-b">
+    <header className="sticky top-0 z-50 w-full border-b border-border bg-background">
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-6">
           <Link href="/" className="font-bold text-xl">
@@ -45,7 +48,8 @@ export function Header() {
             </Link>
           </nav>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <ThemeSwitcher />
           <Button variant="outline" size="sm">
             Connect Wallet
           </Button>
