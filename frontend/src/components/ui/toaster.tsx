@@ -2,26 +2,15 @@
 
 import { Toaster as SonnerToaster } from 'sonner';
 
-type ToasterProps = React.ComponentProps<typeof SonnerToaster>;
-
-export function Toaster({ ...props }: ToasterProps) {
+export function Toaster() {
   return (
     <SonnerToaster
-      position="top-right"
+      position="bottom-right"
       toastOptions={{
         duration: 5000,
-        className: 'toast-body',
-        classNames: {
-          success: 'toast-success',
-          error: 'toast-error',
-          warning: 'toast-warning',
-          info: 'toast-info',
-          loading: 'toast-loading',
-        },
+        className:
+          'border border-neutral-200 bg-white text-neutral-950 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-50',
       }}
-      closeButton
-      richColors
-      {...props}
     />
   );
-} 
+}

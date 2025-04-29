@@ -1,213 +1,200 @@
-'use client';
+// Note: Make sure to install required packages:
+// npm install @suiet/wallet-kit @mysten/sui.js @mysten/wallet-standard
 
-import { toast } from 'react-toastify';
-import { useMemo } from 'react';
-import { useWallet } from '@suiet/wallet-kit';
-import { truncateAddress } from '../utils/format';
-
-/**
- * 钱包连接事件
- */
-export enum WalletEvents {
-  CONNECT = 'wallet_connect',
-  DISCONNECT = 'wallet_disconnect',
-  ACCOUNT_CHANGE = 'wallet_account_change',
-  CHAIN_CHANGE = 'wallet_chain_change',
-  ERROR = 'wallet_error',
-}
-
-/**
- * 钱包相关错误类型
- */
-export enum WalletErrorType {
-  CONNECTION_FAILED = '连接失败',
-  USER_REJECTED = '用户拒绝',
-  WALLET_NOT_INSTALLED = '钱包未安装',
-  WALLET_NOT_SUPPORTED = '不支持的钱包',
-  UNKNOWN_ERROR = '未知错误',
-}
+import { createAppError, ErrorType, handleError } from '@/utils/error-handlers';
+import { SuiClient } from '@mysten/sui.js/client';
+import { TransactionBlock } from '@mysten/sui.js/transactions';
+import { blockchainClient } from './blockchain-client';
 
 /**
  * 钱包连接状态
  */
-export interface WalletStatus {
-  connected: boolean;
-  connecting: boolean;
-  account: any | null;
-  walletName: string | null | undefined;
-  address: string | null;
-  displayAddress: string | null;
-  chainId: string | null;
+export enum WalletConnectionStatus {
+  DISCONNECTED = 'disconnected',
+  CONNECTING = 'connecting',
+  CONNECTED = 'connected',
+  ERROR = 'error',
 }
 
 /**
- * 使用钱包服务的钩子，提供钱包连接相关的状态和方法
+ * 钱包账户信息
  */
-export function useWalletService() {
-  const wallet = useWallet();
+export interface WalletAccount {
+  address: string;
+  publicKey: string;
+  label?: string;
+  iconUrl?: string;
+}
 
-  // 构建钱包状态
-  const walletStatus: WalletStatus = useMemo(() => {
-    const address = wallet.account?.address ?? null;
-    return {
-      connected: wallet.connected,
-      connecting: wallet.connecting,
-      account: wallet.account,
-      walletName: wallet.name,
-      address,
-      displayAddress: address ? truncateAddress(address) : null,
-      chainId: wallet.chain?.id ?? null,
-    };
-  }, [wallet.connected, wallet.connecting, wallet.account, wallet.name, wallet.chain]);
+/**
+ * 钱包交互和管理服务
+ */
+export class WalletService {
+  private walletInstance: any | null = null;
+  private client: SuiClient;
+
+  constructor() {
+    this.client = blockchainClient.getSuiClient();
+  }
+
+  /**
+   * 初始化钱包连接
+   */
+  public initWallet(walletProvider: any): void {
+    this.walletInstance = walletProvider;
+  }
+
+  /**
+   * 检查钱包是否正确初始化
+   */
+  public isInitialized(): boolean {
+    return !!this.walletInstance;
+  }
+
+  /**
+   * 获取钱包连接状态
+   */
+  public getStatus(): WalletConnectionStatus {
+    if (!this.walletInstance) {
+      return WalletConnectionStatus.DISCONNECTED;
+    }
+
+    try {
+      const isConnected = this.walletInstance.isConnected();
+      return isConnected ? WalletConnectionStatus.CONNECTED : WalletConnectionStatus.DISCONNECTED;
+    } catch (error) {
+      console.error('检查钱包连接状态出错:', error);
+      return WalletConnectionStatus.ERROR;
+    }
+  }
 
   /**
    * 连接钱包
    */
-  const connectWallet = async () => {
+  public async connect(): Promise<WalletAccount> {
     try {
-      if (wallet.connecting) return;
-      
-      await wallet.select('选择钱包');
-      toast.success('钱包连接成功');
-      
-      // 触发全局事件，通知其他组件
-      window.dispatchEvent(
-        new CustomEvent(WalletEvents.CONNECT, {
-          detail: {
-            address: wallet.account?.address,
-            walletName: wallet.name,
-          },
-        })
-      );
-    } catch (error: any) {
-      let errorMessage = WalletErrorType.UNKNOWN_ERROR;
-      
-      if (error.message?.includes('rejected')) {
-        errorMessage = WalletErrorType.USER_REJECTED;
-      } else if (error.message?.includes('not installed')) {
-        errorMessage = WalletErrorType.WALLET_NOT_INSTALLED;
-      } else if (error.message?.includes('failed')) {
-        errorMessage = WalletErrorType.CONNECTION_FAILED;
+      if (!this.walletInstance) {
+        throw createAppError('钱包提供程序未初始化', ErrorType.WALLET);
       }
-      
-      toast.error(`钱包连接失败: ${errorMessage}`);
-      
-      window.dispatchEvent(
-        new CustomEvent(WalletEvents.ERROR, {
-          detail: { error: errorMessage },
-        })
-      );
+
+      const accounts = await this.walletInstance.getAccounts();
+      if (!accounts || accounts.length === 0) {
+        throw createAppError('钱包中未找到账户', ErrorType.WALLET);
+      }
+
+      const account = accounts[0];
+      return {
+        address: account.address,
+        publicKey: account.publicKey?.toString() || '',
+        label: account.label,
+        iconUrl: account.iconUrl,
+      };
+    } catch (error) {
+      throw handleError(error, {
+        context: 'WalletService.connect',
+        fallbackMessage: '连接钱包失败',
+      });
     }
-  };
+  }
 
   /**
    * 断开钱包连接
    */
-  const disconnectWallet = () => {
+  public async disconnect(): Promise<void> {
     try {
-      wallet.disconnect();
-      toast.info('钱包已断开连接');
-      
-      // 触发全局事件
-      window.dispatchEvent(new CustomEvent(WalletEvents.DISCONNECT));
-    } catch (error) {
-      console.error('断开钱包连接时出错:', error);
-    }
-  };
-
-  /**
-   * 检查钱包连接状态
-   */
-  const requireWalletConnection = (): boolean => {
-    if (!wallet.connected) {
-      toast.warning('请先连接钱包');
-      return false;
-    }
-    return true;
-  };
-
-  return {
-    wallet,
-    walletStatus,
-    connectWallet,
-    disconnectWallet,
-    requireWalletConnection,
-  };
-}
-
-/**
- * 钱包服务类，用于管理全局钱包相关操作
- */
-export class WalletService {
-  /**
-   * 检查钱包连接状态
-   * @param address 钱包地址
-   * @returns 是否已连接
-   */
-  static checkWalletConnection(address?: string | null): boolean {
-    if (!address) {
-      toast.warning('请先连接钱包');
-      return false;
-    }
-    return true;
-  }
-
-  /**
-   * 添加钱包事件监听器
-   * @param event 事件类型
-   * @param callback 回调函数
-   */
-  static addEventListener(
-    event: WalletEvents,
-    callback: (event: CustomEvent) => void
-  ): void {
-    window.addEventListener(event, callback as EventListener);
-  }
-
-  /**
-   * 移除钱包事件监听器
-   * @param event 事件类型
-   * @param callback 回调函数
-   */
-  static removeEventListener(
-    event: WalletEvents,
-    callback: (event: CustomEvent) => void
-  ): void {
-    window.removeEventListener(event, callback as EventListener);
-  }
-
-  /**
-   * 获取添加钱包后导航的URL
-   * @param fallbackURL 后备URL
-   * @returns 导航URL
-   */
-  static getPostWalletConnectRedirectUrl(fallbackURL: string = '/'): string {
-    try {
-      // 从会话存储中获取重定向URL
-      const redirectUrl = sessionStorage.getItem('wallet_connect_redirect');
-      if (redirectUrl) {
-        // 使用后清除存储的URL
-        sessionStorage.removeItem('wallet_connect_redirect');
-        return redirectUrl;
+      if (this.walletInstance && this.walletInstance.disconnect) {
+        await this.walletInstance.disconnect();
       }
     } catch (error) {
-      console.error('获取重定向URL时出错:', error);
+      throw handleError(error, {
+        context: 'WalletService.disconnect',
+        fallbackMessage: '断开钱包连接失败',
+      });
     }
-    
-    return fallbackURL;
   }
 
   /**
-   * 设置连接钱包后的重定向URL
-   * @param url 重定向URL
+   * 获取钱包账户
    */
-  static setPostWalletConnectRedirectUrl(url: string): void {
+  public async getAccount(): Promise<WalletAccount | null> {
     try {
-      sessionStorage.setItem('wallet_connect_redirect', url);
+      if (!this.walletInstance || !this.walletInstance.isConnected()) {
+        return null;
+      }
+
+      const accounts = await this.walletInstance.getAccounts();
+      if (!accounts || accounts.length === 0) {
+        return null;
+      }
+
+      const account = accounts[0];
+      return {
+        address: account.address,
+        publicKey: account.publicKey?.toString() || '',
+        label: account.label,
+        iconUrl: account.iconUrl,
+      };
     } catch (error) {
-      console.error('设置重定向URL时出错:', error);
+      console.error('获取钱包账户出错:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 获取钱包余额
+   */
+  public async getBalance(address?: string): Promise<bigint> {
+    try {
+      const account = await this.getAccount();
+      if (!account && !address) {
+        throw createAppError('未连接钱包且未提供地址', ErrorType.WALLET);
+      }
+
+      const targetAddress = address || account!.address;
+      return await blockchainClient.getBalance(targetAddress);
+    } catch (error) {
+      throw handleError(error, {
+        context: 'WalletService.getBalance',
+        fallbackMessage: '获取钱包余额失败',
+      });
+    }
+  }
+
+  /**
+   * 执行交易
+   */
+  public async executeTransaction(
+    transactionBlock: TransactionBlock,
+    options?: {
+      requestType?: 'WaitForLocalExecution' | 'WaitForEffectsCert';
+    }
+  ) {
+    try {
+      if (!this.walletInstance || !this.walletInstance.isConnected()) {
+        throw createAppError('钱包未连接', ErrorType.WALLET);
+      }
+
+      // 从钱包实例获取签名者
+      const signer = this.walletInstance.getAccounts()[0];
+      if (!signer) {
+        throw createAppError('钱包中没有可用账户', ErrorType.WALLET);
+      }
+
+      // 执行交易
+      return await blockchainClient.executeTransaction(
+        transactionBlock,
+        this.walletInstance,
+        options
+      );
+    } catch (error) {
+      throw handleError(error, {
+        context: 'WalletService.executeTransaction',
+        fallbackMessage: '执行交易失败',
+      });
     }
   }
 }
 
-export default WalletService; 
+// 导出默认实例
+const walletService = new WalletService();
+export { walletService };

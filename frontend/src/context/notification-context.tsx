@@ -3,7 +3,7 @@
 import React, { createContext, useContext } from 'react';
 import { toast, ToastT } from 'sonner';
 
-// 定义通知上下文的类型
+// Define notification context type
 type NotificationContextType = {
   showSuccess: (message: string, options?: Partial<ToastT>) => void;
   showError: (message: string | Error, options?: Partial<ToastT>) => void;
@@ -12,7 +12,7 @@ type NotificationContextType = {
   showLoading: (message: string, options?: Partial<ToastT>) => string | number;
 };
 
-// 创建通知上下文
+// Create notification context
 const NotificationContext = createContext<NotificationContextType>({
   showSuccess: () => {},
   showError: () => {},
@@ -21,30 +21,30 @@ const NotificationContext = createContext<NotificationContextType>({
   showLoading: () => '',
 });
 
-// 通知提供者组件
+// Notification provider component
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
-  // 显示成功通知
+  // Display success notification
   const showSuccess = (message: string, options?: Partial<ToastT>) => {
     toast.success(message, options);
   };
 
-  // 显示错误通知
+  // Display error notification
   const showError = (message: string | Error, options?: Partial<ToastT>) => {
     const errorMessage = message instanceof Error ? message.message : message;
     toast.error(errorMessage, options);
   };
 
-  // 显示警告通知
+  // Display warning notification
   const showWarning = (message: string, options?: Partial<ToastT>) => {
     toast.warning(message, options);
   };
 
-  // 显示信息通知
+  // Display info notification
   const showInfo = (message: string, options?: Partial<ToastT>) => {
     toast.info(message, options);
   };
 
-  // 显示加载通知，返回id以便更新或取消
+  // Display loading notification, returns id for updating or cancelling
   const showLoading = (message: string, options?: Partial<ToastT>) => {
     return toast.loading(message, options);
   };
@@ -64,5 +64,5 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   );
 }
 
-// 创建通知钩子以便在组件中使用
-export const useNotification = () => useContext(NotificationContext); 
+// Create notification hook for use in components
+export const useNotification = () => useContext(NotificationContext);

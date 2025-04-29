@@ -2,158 +2,204 @@
 
 import { toast } from 'sonner';
 import { handleBlockchainError, retryOperation } from '@/utils/error-handlers';
+import { SuiClient, getFullnodeUrl } from '@mysten/sui.js/client';
+import { TransactionBlock } from '@mysten/sui.js/transactions';
+import { bcs } from '@mysten/sui.js/bcs';
+import { Ed25519Keypair } from '@mysten/sui.js/keypairs/ed25519';
+import { createAppError, ErrorType, handleError } from '@/utils/error-handlers';
 
 /**
- * 区块链客户端，集成错误处理
+ * 支持的链网络类型
  */
-export class BlockchainClient {
+export enum NetworkType {
+  MAINNET = 'mainnet',
+  TESTNET = 'testnet',
+  DEVNET = 'devnet',
+  LOCALNET = 'localnet',
+}
+
+/**
+ * 区块链客户端配置
+ */
+interface BlockchainClientConfig {
+  network: NetworkType;
+  customRpcUrl?: string;
+}
+
+/**
+ * 区块链客户端服务，用于与Sui网络交互
+ */
+class BlockchainClient {
+  private client: SuiClient;
+  private network: NetworkType;
+
+  constructor(config: BlockchainClientConfig = { network: NetworkType.TESTNET }) {
+    this.network = config.network;
+    const rpcUrl = config.customRpcUrl || this.getNetworkRpcUrl(config.network);
+    this.client = new SuiClient({ url: rpcUrl });
+  }
+
   /**
-   * 执行区块链交易，带有错误处理和多次尝试
+   * 获取SUI客户端实例
    */
-  static async executeTransaction<T>(
-    transactionFn: () => Promise<T>,
-    {
-      onBefore,
-      onSuccess,
-      onError,
-      transactionName = '交易',
-      maxRetries = 1,
-      showLoadingToast = true,
-    }: {
-      onBefore?: () => void;
-      onSuccess?: (result: T) => void;
-      onError?: (error: any) => void;
-      transactionName?: string;
-      maxRetries?: number;
-      showLoadingToast?: boolean;
-    } = {}
-  ): Promise<T | null> {
+  public getSuiClient(): SuiClient {
+    return this.client;
+  }
+
+  /**
+   * 获取当前网络类型
+   */
+  public getNetwork(): NetworkType {
+    return this.network;
+  }
+
+  /**
+   * 切换网络
+   */
+  public switchNetwork(network: NetworkType, customRpcUrl?: string): void {
+    this.network = network;
+    const rpcUrl = customRpcUrl || this.getNetworkRpcUrl(network);
+    this.client = new SuiClient({ url: rpcUrl });
+  }
+
+  /**
+   * 获取网络RPC URL
+   */
+  private getNetworkRpcUrl(network: NetworkType): string {
+    switch (network) {
+      case NetworkType.MAINNET:
+        return getFullnodeUrl('mainnet');
+      case NetworkType.TESTNET:
+        return getFullnodeUrl('testnet');
+      case NetworkType.DEVNET:
+        return getFullnodeUrl('devnet');
+      case NetworkType.LOCALNET:
+        return 'http://localhost:9000';
+      default:
+        return getFullnodeUrl('testnet');
+    }
+  }
+
+  /**
+   * 获取账户余额
+   */
+  public async getBalance(address: string): Promise<bigint> {
     try {
-      // 执行交易前的回调
-      if (onBefore) {
-        onBefore();
-      }
+      const { totalBalance } = await this.client.getBalance({
+        owner: address,
+      });
 
-      // 显示加载中提示
-      let toastId;
-      if (showLoadingToast) {
-        toastId = toast.loading(`${transactionName}正在处理中...`);
-      }
+      return totalBalance;
+    } catch (error) {
+      throw handleError(error, {
+        context: 'BlockchainClient.getBalance',
+        fallbackMessage: '无法获取账户余额',
+      });
+    }
+  }
 
-      // 执行交易，可以重试指定次数
-      const result = await retryOperation(
-        async () => {
-          return await transactionFn();
+  /**
+   * 获取账户所拥有的NFT
+   */
+  public async getOwnedObjects(address: string, options?: { limit?: number; cursor?: string }) {
+    try {
+      const response = await this.client.getOwnedObjects({
+        owner: address,
+        limit: options?.limit,
+        cursor: options?.cursor,
+      });
+
+      return response;
+    } catch (error) {
+      throw handleError(error, {
+        context: 'BlockchainClient.getOwnedObjects',
+        fallbackMessage: '无法获取账户拥有的对象',
+      });
+    }
+  }
+
+  /**
+   * 获取对象详细信息
+   */
+  public async getObject(objectId: string) {
+    try {
+      const object = await this.client.getObject({
+        id: objectId,
+        options: {
+          showContent: true,
+          showOwner: true,
         },
-        maxRetries
-      );
+      });
 
-      // 清除加载中提示
-      if (toastId) {
-        toast.dismiss(toastId);
+      return object;
+    } catch (error) {
+      throw handleError(error, {
+        context: 'BlockchainClient.getObject',
+        fallbackMessage: '无法获取对象信息',
+      });
+    }
+  }
+
+  /**
+   * 执行交易
+   */
+  public async executeTransaction(
+    transactionBlock: TransactionBlock,
+    signer: any,
+    options?: {
+      requestType?: 'WaitForLocalExecution' | 'WaitForEffectsCert';
+    }
+  ) {
+    try {
+      if (!signer) {
+        throw createAppError('未提供签名者', ErrorType.WALLET);
       }
 
-      // 显示成功提示
-      toast.success(`${transactionName}已成功`);
-
-      // 执行成功回调
-      if (onSuccess) {
-        onSuccess(result);
-      }
+      const result = await signer.signAndExecuteTransactionBlock({
+        transactionBlock,
+        options: {
+          showObjectChanges: true,
+          showEffects: true,
+          showEvents: true,
+          showInput: true,
+          ...options,
+        },
+      });
 
       return result;
     } catch (error) {
-      // 处理区块链错误
-      handleBlockchainError(error, transactionName);
-
-      // 执行错误回调
-      if (onError) {
-        onError(error);
-      }
-
-      // 记录错误
-      console.error(`区块链交易错误 (${transactionName}):`, error);
-
-      return null;
+      throw handleError(error, {
+        context: 'BlockchainClient.executeTransaction',
+        fallbackMessage: '执行交易失败',
+      });
     }
   }
 
   /**
-   * 查询区块链数据，带有错误处理
+   * 获取交易详情
    */
-  static async queryBlockchain<T>(
-    queryFn: () => Promise<T>,
-    {
-      queryName = '查询',
-      maxRetries = 2,
-      showLoadingToast = false,
-    }: {
-      queryName?: string;
-      maxRetries?: number;
-      showLoadingToast?: boolean;
-    } = {}
-  ): Promise<T | null> {
+  public async getTransaction(digest: string) {
     try {
-      // 显示加载中提示
-      let toastId;
-      if (showLoadingToast) {
-        toastId = toast.loading(`${queryName}正在进行中...`);
-      }
-
-      // 执行查询，可以重试指定次数
-      const result = await retryOperation(
-        async () => {
-          return await queryFn();
+      const txn = await this.client.getTransactionBlock({
+        digest,
+        options: {
+          showEffects: true,
+          showInput: true,
+          showObjectChanges: true,
+          showEvents: true,
         },
-        maxRetries
-      );
+      });
 
-      // 清除加载中提示
-      if (toastId) {
-        toast.dismiss(toastId);
-      }
-
-      return result;
+      return txn;
     } catch (error) {
-      // 处理区块链错误
-      handleBlockchainError(error, queryName);
-
-      // 记录错误
-      console.error(`区块链查询错误 (${queryName}):`, error);
-
-      return null;
+      throw handleError(error, {
+        context: 'BlockchainClient.getTransaction',
+        fallbackMessage: '无法获取交易详情',
+      });
     }
   }
+}
 
-  /**
-   * 检查钱包连接状态，如未连接则提示
-   */
-  static checkWalletConnection(walletConnected: boolean): boolean {
-    if (!walletConnected) {
-      toast.error('请先连接钱包');
-      return false;
-    }
-    return true;
-  }
-
-  /**
-   * 监听区块链事件
-   */
-  static setupEventListener(
-    listenerFn: () => any,
-    cleanupFn: () => void,
-    eventName = '事件'
-  ): () => void {
-    try {
-      const listener = listenerFn();
-      return () => {
-        try {
-          cleanupFn();
-        } catch (error) {
-          console.error(`清理${eventName}监听器错误:`, error);
-        }
-      };
-    } catch (error) {
-      console.error(`设置${eventName}监听器错误:`, error);
-      toast.error(`无法监听${eventName}`);
- 
+// 导出单例实例
+const blockchainClient = new BlockchainClient({ network: NetworkType.TESTNET });
+export { blockchainClient };

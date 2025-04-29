@@ -1,192 +1,218 @@
 'use client';
 
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, CancelTokenSource } from 'axios';
-import { toast } from 'react-toastify';
-import { handleApiError, retryOperation } from '@/utils/error-handlers';
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
+import { createAppError, ErrorType, handleError } from '@/utils/error-handlers';
 
 /**
- * 配置默认的API基础URL
+ * Configuration options for APIClient
  */
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+export interface APIClientConfig {
+  baseURL?: string;
+  timeout?: number;
+  headers?: Record<string, string>;
+  withCredentials?: boolean;
+}
 
 /**
- * API客户端类，用于管理与后端API的所有通信
+ * A wrapper around axios for making API requests
  */
-export class ApiClient {
-  private axiosInstance: AxiosInstance;
-  private cancelTokens: CancelTokenSource[] = [];
+export class APIClient {
+  private client: AxiosInstance;
 
-  constructor(baseURL: string = API_BASE_URL) {
-    this.axiosInstance = axios.create({
-      baseURL,
+  constructor(config: APIClientConfig = {}) {
+    // Default configuration
+    const defaultConfig: APIClientConfig = {
+      baseURL: process.env.NEXT_PUBLIC_API_URL || '/api',
       timeout: 30000,
       headers: {
         'Content-Type': 'application/json',
+        Accept: 'application/json',
       },
-    });
+      withCredentials: true,
+    };
 
-    // 请求拦截器
-    this.axiosInstance.interceptors.request.use(
-      (config) => {
-        // 为请求添加取消令牌
-        const source = axios.CancelToken.source();
-        this.cancelTokens.push(source);
-        config.cancelToken = source.token;
-
-        // 添加认证令牌（如果存在）
-        const token = localStorage.getItem('auth_token');
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
-        }
-
-        // 显示加载通知（可选）
-        if (config.method !== 'get') {
-          toast.info('正在处理请求...', { autoClose: false, toastId: 'loading' });
-        }
-
-        return config;
-      },
-      (error) => {
-        return Promise.reject(error);
-      }
-    );
-
-    // 响应拦截器
-    this.axiosInstance.interceptors.response.use(
-      (response) => {
-        // 关闭加载通知
-        this.dismissLoadingToast();
-        return response;
-      },
-      (error) => {
-        this.dismissLoadingToast();
-
-        // 处理未授权错误
-        if (error?.response?.status === 401) {
-          // 清除令牌并重定向到登录
-          localStorage.removeItem('auth_token');
-          window.location.href = '/login';
-          return Promise.reject(new Error('未授权访问，请重新登录'));
-        }
-
-        // 处理请求被取消的情况
-        if (axios.isCancel(error)) {
-          return Promise.reject(new Error('请求被取消'));
-        }
-
-        // 显示错误通知
-        const errorMessage = this.extractErrorMessage(error);
-        toast.error(errorMessage);
-        
-        return Promise.reject(error);
-      }
-    );
-  }
-
-  /**
-   * 发送GET请求
-   * @param url API端点
-   * @param params 查询参数
-   * @param config Axios配置选项
-   * @returns Promise
-   */
-  async get<T>(url: string, params?: any, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.axiosInstance.get<T>(url, { ...config, params });
-    return response.data;
-  }
-
-  /**
-   * 发送POST请求
-   * @param url API端点
-   * @param data 请求体数据
-   * @param config Axios配置选项
-   * @returns Promise
-   */
-  async post<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.axiosInstance.post<T>(url, data, config);
-    return response.data;
-  }
-
-  /**
-   * 发送PUT请求
-   * @param url API端点
-   * @param data 请求体数据
-   * @param config Axios配置选项
-   * @returns Promise
-   */
-  async put<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.axiosInstance.put<T>(url, data, config);
-    return response.data;
-  }
-
-  /**
-   * 发送DELETE请求
-   * @param url API端点
-   * @param config Axios配置选项
-   * @returns Promise
-   */
-  async delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.axiosInstance.delete<T>(url, config);
-    return response.data;
-  }
-
-  /**
-   * 上传文件
-   * @param url API端点
-   * @param formData 包含文件的FormData
-   * @param config Axios配置选项
-   * @returns Promise
-   */
-  async uploadFile<T>(url: string, formData: FormData, config?: AxiosRequestConfig): Promise<T> {
-    const uploadConfig: AxiosRequestConfig = {
+    // Create axios instance with merged config
+    this.client = axios.create({
+      ...defaultConfig,
       ...config,
       headers: {
-        'Content-Type': 'multipart/form-data',
-        ...config?.headers,
+        ...defaultConfig.headers,
+        ...config.headers,
       },
-    };
-    const response = await this.axiosInstance.post<T>(url, formData, uploadConfig);
-    return response.data;
-  }
-
-  /**
-   * 取消所有待处理的请求
-   */
-  cancelAllRequests(): void {
-    this.cancelTokens.forEach((source) => {
-      source.cancel('操作被用户取消');
     });
-    this.cancelTokens = [];
+
+    // Set up request interceptors
+    this.setupInterceptors();
   }
 
   /**
-   * 关闭加载通知
+   * Configure request/response interceptors
    */
-  private dismissLoadingToast(): void {
-    toast.dismiss('loading');
+  private setupInterceptors(): void {
+    // Request interceptor
+    this.client.interceptors.request.use(
+      config => {
+        // Add auth token if available
+        const token = this.getAuthToken();
+        if (token && config.headers) {
+          config.headers['Authorization'] = `Bearer ${token}`;
+        }
+        return config;
+      },
+      error => Promise.reject(error)
+    );
+
+    // Response interceptor
+    this.client.interceptors.response.use(
+      response => response,
+      (error: AxiosError) => this.handleRequestError(error)
+    );
   }
 
   /**
-   * 从错误对象中提取错误消息
+   * Get the authentication token from storage
    */
-  private extractErrorMessage(error: any): string {
-    return error?.response?.data?.message 
-      || error?.response?.data?.error 
-      || error?.message 
-      || '未知错误，请稍后再试';
+  private getAuthToken(): string | null {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('authToken');
+    }
+    return null;
+  }
+
+  /**
+   * Handle request errors and standardize them
+   */
+  private handleRequestError(error: AxiosError): Promise<never> {
+    // Network error
+    if (!error.response) {
+      return Promise.reject(
+        createAppError('Network error: Unable to connect to the server', ErrorType.NETWORK, {
+          originalError: error as Error,
+        })
+      );
+    }
+
+    // Server errors based on status code
+    const status = error.response.status;
+    const data = error.response.data as any;
+    const message = data?.message || error.message || 'An unknown error occurred';
+
+    let errorType: ErrorType;
+
+    switch (status) {
+      case 401:
+        errorType = ErrorType.AUTHENTICATION;
+        break;
+      case 403:
+        errorType = ErrorType.AUTHORIZATION;
+        break;
+      case 404:
+        errorType = ErrorType.NOT_FOUND;
+        break;
+      case 422:
+        errorType = ErrorType.VALIDATION;
+        break;
+      case 500:
+      case 502:
+      case 503:
+      case 504:
+        errorType = ErrorType.SERVER;
+        break;
+      default:
+        errorType = ErrorType.UNKNOWN;
+    }
+
+    const appError = createAppError(message, errorType, {
+      code: data?.code || `HTTP_${status}`,
+      details: data?.errors || data?.details,
+      originalError: error as Error,
+    });
+
+    return Promise.reject(appError);
+  }
+
+  /**
+   * Make a GET request
+   */
+  public async get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
+    try {
+      const response: AxiosResponse<T> = await this.client.get(url, config);
+      return response.data;
+    } catch (error) {
+      throw handleError(error, { silent: true, context: 'APIClient.get' });
+    }
+  }
+
+  /**
+   * Make a POST request
+   */
+  public async post<T = any, D = any>(
+    url: string,
+    data?: D,
+    config?: AxiosRequestConfig
+  ): Promise<T> {
+    try {
+      const response: AxiosResponse<T> = await this.client.post(url, data, config);
+      return response.data;
+    } catch (error) {
+      throw handleError(error, { silent: true, context: 'APIClient.post' });
+    }
+  }
+
+  /**
+   * Make a PUT request
+   */
+  public async put<T = any, D = any>(
+    url: string,
+    data?: D,
+    config?: AxiosRequestConfig
+  ): Promise<T> {
+    try {
+      const response: AxiosResponse<T> = await this.client.put(url, data, config);
+      return response.data;
+    } catch (error) {
+      throw handleError(error, { silent: true, context: 'APIClient.put' });
+    }
+  }
+
+  /**
+   * Make a PATCH request
+   */
+  public async patch<T = any, D = any>(
+    url: string,
+    data?: D,
+    config?: AxiosRequestConfig
+  ): Promise<T> {
+    try {
+      const response: AxiosResponse<T> = await this.client.patch(url, data, config);
+      return response.data;
+    } catch (error) {
+      throw handleError(error, { silent: true, context: 'APIClient.patch' });
+    }
+  }
+
+  /**
+   * Make a DELETE request
+   */
+  public async delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
+    try {
+      const response: AxiosResponse<T> = await this.client.delete(url, config);
+      return response.data;
+    } catch (error) {
+      throw handleError(error, { silent: true, context: 'APIClient.delete' });
+    }
   }
 }
 
-// 导出默认实例供应用使用
-const apiClient = new ApiClient();
-export default apiClient;
+// Export a default instance
+const apiClient = new APIClient();
 
-// 导出简化的API方法接口
+// Export simplified API methods interface
 export const api = {
   get: apiClient.get.bind(apiClient),
   post: apiClient.post.bind(apiClient),
   put: apiClient.put.bind(apiClient),
   delete: apiClient.delete.bind(apiClient),
-  uploadFile: apiClient.uploadFile.bind(apiClient),
-  cancelAllRequests: apiClient.cancelAllRequests.bind(apiClient),
-}; 
+};
+
+export { apiClient };

@@ -1,26 +1,19 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { useNotification } from '@/context/notification-context';
-import { RootLayout } from '@/components/layout/RootLayout';
 
-export default function GlobalError({
+export default function Error({
   error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  const { showError } = useNotification();
-
   useEffect(() => {
-    // 记录错误到控制台，在生产环境中可替换为日志服务
-    console.error('全局错误:', error);
-    
-    // 显示通知给用户
-    showError('发生了一个错误，我们已经记录了这个问题');
-  }, [error, showError]);
+    // Log the error to an error reporting service
+    console.error('Application error:', error);
+  }, [error]);
 
   return (
     <html>
@@ -49,9 +42,16 @@ export default function GlobalError({
                 </pre>
               </div>
             )}
+          <div className="my-4 rounded-md bg-neutral-100 p-4 dark:bg-neutral-900">
           </div>
-        </RootLayout>
-      </body>
-    </html>
+        )}
+        <div className="flex flex-wrap justify-center gap-2">
+          <Button onClick={() => reset()}>Try again</Button>
+          <Button variant="outline" onClick={() => (window.location.href = '/')}>
+            Return to home
+          </Button>
+        </div>
+      </div>
+    </div>
   );
-} 
+}

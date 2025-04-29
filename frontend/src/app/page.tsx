@@ -33,7 +33,7 @@ export default function Home() {
                 <Link href="/docs">Learn More</Link>
               </Button>
             </div>
-            
+
             <div className="mt-8 w-full">
               <div className="mb-8">
                 <NotificationTest />

@@ -2,60 +2,32 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { useNotification } from '@/context/notification-context';
 
 interface ErrorFallbackProps {
-  error?: Error;
-  resetError?: () => void;
-  title?: string;
-  message?: string;
-  showErrorDetails?: boolean;
-  showNotification?: boolean;
+  error: Error;
+  resetError: () => void;
 }
 
-export function ErrorFallback({
-  error,
-  resetError,
-  title = '出错了',
-  message = '加载此内容时出现问题',
-  showErrorDetails = false,
-  showNotification = true,
-}: ErrorFallbackProps) {
-  const { showError } = useNotification();
-
-  React.useEffect(() => {
-    if (showNotification && error) {
-      showError('组件加载失败: ' + (error.message || '未知错误'));
-    }
-  }, [error, showError, showNotification]);
-
+export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
   return (
-    <div className="p-6 rounded-lg border border-red-200 bg-red-50 text-red-900 w-full">
-      <h2 className="text-lg font-semibold mb-2">{title}</h2>
-      <p className="mb-4">{message}</p>
-      
-      {showErrorDetails && error && process.env.NODE_ENV !== 'production' && (
-        <div className="mb-4 p-3 bg-red-100 rounded text-sm font-mono overflow-auto max-h-40">
-          {error.message}
-          {error.stack && (
-            <div className="mt-2 text-xs opacity-80 whitespace-pre-wrap">{error.stack}</div>
-          )}
+    <div className="rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-950/50">
+      <h2 className="mb-2 text-xl font-semibold text-red-800 dark:text-red-200">Component Error</h2>
+      <p className="mb-4 text-red-700 dark:text-red-300">
+        An error occurred in this component. You can try resetting or return to the home page.
+      </p>
+      {process.env.NODE_ENV !== 'production' && (
+        <div className="mb-4 max-h-40 overflow-auto rounded bg-red-100 p-3 font-mono text-sm text-red-800 dark:bg-red-900/50 dark:text-red-200">
+          {error.toString()}
         </div>
       )}
-      
-      <div className="flex flex-wrap gap-3">
-        {resetError && (
-          <Button onClick={resetError} variant="destructive" size="sm">
-            重试
-          </Button>
-        )}
-        <Button asChild variant="outline" size="sm">
-          <a href="/">返回首页</a>
+      <div className="flex gap-3">
+        <Button onClick={resetError} variant="destructive" size="sm">
+          Reset
         </Button>
-        <Button onClick={() => window.history.back()} variant="ghost" size="sm">
-          返回上一页
+        <Button asChild variant="outline" size="sm">
+          <a href="/">Return Home</a>
         </Button>
       </div>
     </div>
   );
-} 
+}

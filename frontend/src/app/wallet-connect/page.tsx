@@ -114,13 +114,11 @@ export default function WalletConnectionPage() {
             </div>
             <div className="bg-muted p-4 rounded-md">
               <h3 className="font-medium mb-2">当前状态:</h3>
-              <p>
-                地址: {connectedAddress ? `${connectedAddress.substring(0, 10)}...` : '未连接'}
-              </p>
+              <p>地址: {connectedAddress ? `${connectedAddress.substring(0, 10)}...` : '未连接'}</p>
             </div>
           </div>
         </Card>
       </div>
     </div>
   );
-} 
+}
