@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ThemeSwitcher } from '@/components/ui/theme-switcher';
+import { ConnectWallet } from '@/components/wallet/connect-button';
 
 export function Header() {
   return (
@@ -50,9 +51,7 @@ export function Header() {
         </div>
         <div className="flex items-center gap-3">
           <ThemeSwitcher />
-          <Button variant="outline" size="sm">
-            Connect Wallet
-          </Button>
+          <ConnectWallet />
         </div>
       </div>
     </header>

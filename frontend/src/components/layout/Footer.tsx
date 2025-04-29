@@ -1,5 +1,5 @@
-import * as React from "react";
-import Link from "next/link";
+import * as React from 'react';
+import Link from 'next/link';
 
 export function Footer() {
   return (
@@ -29,7 +29,10 @@ export function Footer() {
           <div className="flex flex-col gap-2">
             <h3 className="text-base font-medium">Resources</h3>
             <nav className="flex flex-col gap-2">
-              <Link href="/documentation" className="text-sm text-muted-foreground hover:text-foreground">
+              <Link
+                href="/documentation"
+                className="text-sm text-muted-foreground hover:text-foreground"
+              >
                 Documentation
               </Link>
               <Link href="/faq" className="text-sm text-muted-foreground hover:text-foreground">
@@ -43,14 +46,29 @@ export function Footer() {
           <div className="flex flex-col gap-2">
             <h3 className="text-base font-medium">Community</h3>
             <nav className="flex flex-col gap-2">
-              <Link href="https://twitter.com" className="text-sm text-muted-foreground hover:text-foreground" target="_blank" rel="noopener noreferrer">
+              <Link
+                href="https://twitter.com"
+                className="text-sm text-muted-foreground hover:text-foreground"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 Twitter
               </Link>
-              <Link href="https://discord.com" className="text-sm text-muted-foreground hover:text-foreground" target="_blank" rel="noopener noreferrer">
+              <Link
+                href="https://discord.com"
+                className="text-sm text-muted-foreground hover:text-foreground"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 Discord
               </Link>
-              <Link href="https://github.com" className="text-sm text-muted-foreground hover:text-foreground" target="_blank" rel="noopener noreferrer">
-              GitHub
+              <Link
+                href="https://github.com"
+                className="text-sm text-muted-foreground hover:text-foreground"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                GitHub
               </Link>
             </nav>
           </div>
