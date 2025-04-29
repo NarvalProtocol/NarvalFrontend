@@ -4,12 +4,28 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ThemeSwitcher } from '@/components/ui/theme-switcher';
 import { ConnectWallet } from '@/components/wallet/connect-button';
+import { Menu } from 'lucide-react';
 
-export function Header() {
+interface HeaderProps {
+  onOpenSidebar?: () => void;
+}
+
+export function Header({ onOpenSidebar }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background">
       <div className="container flex h-16 items-center justify-between">
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4">
+          {/* Mobile hamburger menu button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="md:hidden"
+            onClick={onOpenSidebar}
+            aria-label="Open menu"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+          
           <Link href="/" className="font-bold text-xl">
             Narval
           </Link>

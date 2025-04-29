@@ -1,13 +1,13 @@
 /**
- * 格式化工具函数
+ * Formatting utility functions
  */
 
 /**
- * 截断加密钱包地址，显示开头和结尾，中间用省略号表示
- * @param address 完整地址
- * @param prefixLength 保留前缀的长度，默认为6
- * @param suffixLength 保留后缀的长度，默认为4
- * @returns 处理后的地址
+ * Truncate cryptocurrency wallet address, showing beginning and end, with ellipsis in the middle
+ * @param address Complete address
+ * @param prefixLength Length of prefix to keep, default is 6
+ * @param suffixLength Length of suffix to keep, default is 4
+ * @returns Processed address
  */
 export function truncateAddress(
   address: string,
@@ -24,11 +24,11 @@ export function truncateAddress(
 }
 
 /**
- * 格式化货币数值
- * @param amount 金额
- * @param decimals 小数位数，默认为2
- * @param symbol 货币符号，默认为空
- * @returns 格式化后的货币字符串
+ * Format currency values
+ * @param amount Amount
+ * @param decimals Decimal places, default is 2
+ * @param symbol Currency symbol, default is empty
+ * @returns Formatted currency string
  */
 export function formatCurrency(
   value: number | string,
@@ -76,26 +76,26 @@ export function formatCurrency(
 }
 
 /**
- * 格式化百分比
- * @param value 百分比值（0-1之间的小数）
- * @param decimals 小数位数，默认为2
- * @returns 格式化后的百分比字符串
+ * Format percentage
+ * @param value Percentage value (decimal between 0-1)
+ * @param decimals Decimal places, default is 2
+ * @returns Formatted percentage string
  */
 export function formatPercent(value: number | string, decimals: number = 2): string {
   const numValue = typeof value === 'string' ? parseFloat(value) : value;
   if (isNaN(numValue)) return '0%';
 
-  // 将小数转换为百分比
+  // Convert decimal to percentage
   const percentValue = numValue * 100;
 
   return `${percentValue.toFixed(decimals)}%`;
 }
 
 /**
- * 格式化日期时间
- * @param date 日期对象或时间戳
- * @param format 格式化模式，默认为'datetime'
- * @returns 格式化后的日期时间字符串
+ * Format date and time
+ * @param date Date object or timestamp
+ * @param format Formatting mode, default is 'datetime'
+ * @returns Formatted date time string
  */
 export function formatDateTime(
   date: Date | number | string,
@@ -119,7 +119,7 @@ export function formatDateTime(
     options.second = '2-digit';
   }
 
-  return dateObj.toLocaleString('zh-CN', options);
+  return dateObj.toLocaleString('en-US', options);
 }
 
 /**

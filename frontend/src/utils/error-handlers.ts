@@ -3,7 +3,7 @@
 import { toast } from 'sonner';
 
 /**
- * 错误类型枚举
+ * Error type enumeration
  */
 export enum ErrorType {
   NETWORK = 'network',
@@ -18,7 +18,7 @@ export enum ErrorType {
 }
 
 /**
- * 应用程序错误接口
+ * Application error interface
  */
 export interface AppError extends Error {
   type: ErrorType;
@@ -28,7 +28,7 @@ export interface AppError extends Error {
 }
 
 /**
- * 创建应用程序错误对象
+ * Create application error object
  */
 export function createAppError(
   message: string,
@@ -51,7 +51,7 @@ export function createAppError(
 }
 
 /**
- * 处理并格式化错误对象
+ * Handle and format error objects
  */
 export function handleError(
   error: unknown,
@@ -61,9 +61,9 @@ export function handleError(
     fallbackMessage?: string;
   } = {}
 ): AppError {
-  const { silent = false, context, fallbackMessage = '发生未知错误' } = options;
+  const { silent = false, context, fallbackMessage = 'An unknown error occurred' } = options;
 
-  // 如果已经是 AppError，直接返回
+  // If already an AppError, return directly
   if (isAppError(error)) {
     if (context && !error.context) {
       error.context = context;
@@ -77,7 +77,7 @@ export function handleError(
     return error;
   }
 
-  // 转换为 AppError
+  // Convert to AppError
   const appError = convertToAppError(error, fallbackMessage, context);
 
   if (!silent) {
@@ -91,7 +91,7 @@ export function handleError(
 }
 
 /**
- * 检查对象是否为应用程序错误
+ * Check if an object is an application error
  */
 function isAppError(error: unknown): error is AppError {
   return (
@@ -102,7 +102,7 @@ function isAppError(error: unknown): error is AppError {
 }
 
 /**
- * 将未知错误转换为应用程序错误
+ * Convert unknown error to application error
  */
 function convertToAppError(error: unknown, fallbackMessage: string, context?: string): AppError {
   let message = fallbackMessage;
@@ -112,7 +112,7 @@ function convertToAppError(error: unknown, fallbackMessage: string, context?: st
   if (error instanceof Error) {
     message = error.message || fallbackMessage;
 
-    // 检查错误类型
+    // Check error type
     if (
       error.name === 'NetworkError' ||
       message.includes('network') ||
@@ -137,7 +137,7 @@ function convertToAppError(error: unknown, fallbackMessage: string, context?: st
       type = ErrorType.SERVER;
     }
 
-    // 尝试获取状态码
+    // Try to get status code
     if ('statusCode' in error) {
       statusCode = Number(error.statusCode);
     } else if (message.includes('404')) {
@@ -168,7 +168,7 @@ function convertToAppError(error: unknown, fallbackMessage: string, context?: st
 }
 
 /**
- * 获取错误消息文本
+ * Get error message text
  */
 export function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -183,7 +183,7 @@ export function getErrorMessage(error: unknown): string {
   ) {
     return error.message;
   }
-  return '未知错误';
+  return 'Unknown error';
 }
 
 /**
@@ -218,127 +218,127 @@ export function setupGlobalErrorHandlers() {
 }
 
 /**
- * 处理区块链相关错误，显示友好消息
+ * Handle blockchain related errors, display friendly messages
  */
-export function handleBlockchainError(error: any, operation: string = '操作'): void {
-  // 提取错误消息
+export function handleBlockchainError(error: any, operation: string = 'operation'): void {
+  // Extract error message
   let errorMessage = getErrorMessage(error);
 
-  // 处理常见的区块链错误类型
+  // Handle common blockchain error types
   if (errorMessage.includes('user rejected') || errorMessage.includes('User denied')) {
-    toast.error(`用户取消了${operation}`);
+    toast.error(`User canceled ${operation}`);
     return;
   }
 
   if (errorMessage.includes('insufficient funds')) {
-    toast.error(`余额不足，无法完成${operation}`);
+    toast.error(`Insufficient balance, unable to complete ${operation}`);
     return;
   }
 
   if (errorMessage.includes('nonce')) {
-    toast.error(`交易nonce错误，请刷新页面重试`);
+    toast.error(`Transaction nonce error, please refresh the page and try again`);
     return;
   }
 
   if (errorMessage.includes('gas')) {
-    toast.error(`Gas费用估算失败，请调整参数后重试`);
+    toast.error(`Gas estimation failed, please adjust parameters and try again`);
     return;
   }
 
   if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
-    toast.error(`${operation}超时，请检查网络后重试`);
+    toast.error(`${operation} timed out, please check your network and try again`);
     return;
   }
 
   if (errorMessage.includes('network') || errorMessage.includes('Network')) {
-    toast.error(`网络错误，请检查您的连接后重试`);
+    toast.error(`Network error, please check your connection and try again`);
     return;
   }
 
-  // 显示通用错误信息
-  toast.error(`${operation}失败: ${errorMessage}`);
+  // Display generic error information
+  toast.error(`${operation} failed: ${errorMessage}`);
 }
 
 /**
- * 处理API错误，显示友好消息
+ * Handle API errors, display friendly messages
  */
-export function handleApiError(error: any, operation: string = '请求'): void {
-  // 提取错误消息
+export function handleApiError(error: any, operation: string = 'request'): void {
+  // Extract error message
   let errorMessage = getErrorMessage(error);
   const statusCode = error?.response?.status || error?.status;
 
-  // 处理常见的HTTP状态码
+  // Handle common HTTP status codes
   if (statusCode) {
     switch (statusCode) {
       case 400:
-        toast.error(`请求参数错误: ${errorMessage}`);
+        toast.error(`Request parameter error: ${errorMessage}`);
         return;
       case 401:
-        toast.error('您尚未登录或登录已过期，请重新登录');
-        // 这里可以添加重定向到登录页的逻辑
+        toast.error('You are not logged in or your login has expired, please log in again');
+        // Here you can add logic to redirect to the login page
         return;
       case 403:
-        toast.error('您没有权限执行此操作');
+        toast.error('You do not have permission to perform this operation');
         return;
       case 404:
-        toast.error(`未找到请求的资源: ${errorMessage}`);
+        toast.error(`Requested resource not found: ${errorMessage}`);
         return;
       case 429:
-        toast.error('请求过于频繁，请稍后再试');
+        toast.error('Request too frequent, please try again later');
         return;
       case 500:
       case 502:
       case 503:
       case 504:
-        toast.error('服务器错误，请稍后再试');
+        toast.error('Server error, please try again later');
         return;
     }
   }
 
-  // 网络连接问题
+  // Network connection issue
   if (error.name === 'NetworkError' || !navigator.onLine) {
-    toast.error('网络连接错误，请检查您的网络');
+    toast.error('Network connection error, please check your network');
     return;
   }
 
-  // 显示通用错误信息
-  toast.error(`${operation}失败: ${errorMessage}`);
+  // Display generic error information
+  toast.error(`${operation} failed: ${errorMessage}`);
 }
 
 /**
- * 重试函数，可以在失败时多次尝试
+ * Retry function, can be used to retry multiple times in case of failure
  */
 export async function retryOperation<T>(
   operation: () => Promise<T>,
   maxRetries: number = 2,
   delayMs: number = 1000
 ): Promise<T> {
-  let lastError: any;
+  let lastError: unknown;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      // 尝试执行操作
+      // Try to execute operation
       return await operation();
     } catch (error) {
       lastError = error;
 
-      // 如果已经达到最大重试次数，则不再重试
+      // If maximum retries reached, do not retry
       if (attempt >= maxRetries) {
         break;
       }
 
-      // 等待一段时间后重试（每次重试增加等待时间）
+      // Wait for a period before retrying (each retry increases waiting time)
       const waitTime = delayMs * Math.pow(2, attempt);
       await new Promise(resolve => setTimeout(resolve, waitTime));
     }
   }
 
-  // 如果所有尝试都失败，抛出最后一个错误
+  // If all attempts fail, throw the last error
   throw lastError;
 }
 
 /**
- * 防抖函数，用于限制函数调用频率
+ * Debounce function, used to limit function call frequency
  */
 export function debounce<T extends (...args: any[]) => any>(
   func: T,
@@ -346,29 +346,29 @@ export function debounce<T extends (...args: any[]) => any>(
 ): (...args: Parameters<T>) => void {
   let timeout: ReturnType<typeof setTimeout> | null = null;
 
-  return function (...args: Parameters<T>): void {
-    if (timeout) {
-      clearTimeout(timeout);
-    }
+  return function (this: any, ...args: Parameters<T>) {
+    const context = this;
+    if (timeout) clearTimeout(timeout);
 
     timeout = setTimeout(() => {
-      func(...args);
+      func.apply(context, args);
     }, wait);
   };
 }
 
 /**
- * 节流函数，用于限制函数调用频率
+ * Throttle function, used to limit function call frequency
  */
 export function throttle<T extends (...args: any[]) => any>(
   func: T,
   limit: number = 300
 ): (...args: Parameters<T>) => void {
-  let inThrottle: boolean = false;
+  let inThrottle = false;
 
-  return function (...args: Parameters<T>): void {
+  return function (this: any, ...args: Parameters<T>) {
+    const context = this;
     if (!inThrottle) {
-      func(...args);
+      func.apply(context, args);
       inThrottle = true;
       setTimeout(() => {
         inThrottle = false;

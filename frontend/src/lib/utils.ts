@@ -2,7 +2,7 @@ import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 /**
- * 合并类名，解决 Tailwind 类名优先级冲突
+ * Merge classnames and resolve Tailwind class priority conflicts
  */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

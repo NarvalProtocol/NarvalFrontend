@@ -9,10 +9,10 @@ export function SuiConnectButton() {
 }
 
 export function CustomSuiConnectButton() {
-  return <ConnectButton connectText="连接 Sui 钱包" />;
+  return <ConnectButton connectText="Connect Sui Wallet" />;
 }
 
-// 由于 ConnectButton 组件的类型问题，暂时简化此组件
+// Due to type issues with the ConnectButton component, this component is simplified
 export function ButtonSuiConnectButton() {
-  return <ConnectButton connectText="连接 Sui 钱包" />;
+  return <ConnectButton connectText="Connect Sui Wallet" />;
 }

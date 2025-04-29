@@ -1,6 +1,7 @@
+'use client';
+
 import { ReactNode } from 'react';
-import { Header } from './Header';
-import { Footer } from './Footer';
+import { MainLayout } from './main-layout';
 
 interface RootLayoutProps {
   children: ReactNode;
@@ -8,10 +9,8 @@ interface RootLayoutProps {
 
 export function RootLayout({ children }: RootLayoutProps) {
   return (
-    <div className="flex min-h-screen flex-col">
-      <Header />
-      <main className="flex-1">{children}</main>
-      <Footer />
-    </div>
+    <MainLayout>
+      {children}
+    </MainLayout>
   );
 }

@@ -1,14 +1,16 @@
+import React from 'react';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import '@mysten/dapp-kit/dist/index.css';
 import { AppProvider } from '@/components/providers/app-provider';
+import { WalletProvider } from '@/components/wallet/WalletProvider';
 
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Narval - DeFi Liquidity Management Platform',
-  description: 'Modern solution for DeFi liquidity and recursive lending management',
+  title: 'Narval Finance',
+  description: 'Next-gen DeFi platform on Sui Network',
 };
 
 export default function RootLayout({
@@ -19,7 +21,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <AppProvider>{children}</AppProvider>
+        <AppProvider>
+          <WalletProvider>
+            {children}
+          </WalletProvider>
+        </AppProvider>
       </body>
     </html>
   );
